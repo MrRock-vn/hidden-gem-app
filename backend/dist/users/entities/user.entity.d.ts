@@ -14,6 +14,8 @@ export declare class User {
     google_id?: string;
     apple_id?: string;
     refresh_token?: string;
+    device_token?: string;
+    push_notifications_enabled: boolean;
     created_at: Date;
     places: Place[];
     comments: Comment[];

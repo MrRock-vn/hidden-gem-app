@@ -10,6 +10,7 @@ export declare class Place {
     category: string;
     latitude: number;
     longitude: number;
+    location: string;
     address: string;
     tags: string[];
     is_published: boolean;

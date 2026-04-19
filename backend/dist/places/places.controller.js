@@ -16,14 +16,17 @@ exports.PlacesController = void 0;
 const common_1 = require("@nestjs/common");
 const platform_express_1 = require("@nestjs/platform-express");
 const places_service_1 = require("./places.service");
+const media_service_1 = require("../media/media.service");
 const create_place_dto_1 = require("./dto/create-place.dto");
 const query_place_dto_1 = require("./dto/query-place.dto");
 const current_user_decorator_1 = require("../auth/decorators/current-user.decorator");
 const public_decorator_1 = require("../auth/decorators/public.decorator");
 let PlacesController = class PlacesController {
     placesService;
-    constructor(placesService) {
+    mediaService;
+    constructor(placesService, mediaService) {
         this.placesService = placesService;
+        this.mediaService = mediaService;
     }
     async findAll(query) {
         return this.placesService.findAll(query);
@@ -35,7 +38,9 @@ let PlacesController = class PlacesController {
         return this.placesService.findById(id, currentUserId);
     }
     async create(userId, createPlaceDto, files) {
-        const imageUrls = files?.map((f) => `/uploads/places/${f.filename}`) || [];
+        const imageUrls = files && files.length > 0
+            ? await this.mediaService.processPlaceImages(files)
+            : [];
         return this.placesService.create(userId, createPlaceDto, imageUrls);
     }
     async toggleLike(userId, placeId) {
@@ -43,6 +48,9 @@ let PlacesController = class PlacesController {
     }
     async delete(placeId, userId) {
         return this.placesService.deletePlace(placeId, userId);
+    }
+    async toggleBookmark(userId, placeId) {
+        return this.placesService.toggleBookmark(userId, placeId);
     }
     async getUserPlaces(userId, page, limit) {
         return this.placesService.getUserPlaces(userId, page ? +page : undefined, limit ? +limit : undefined);
@@ -104,6 +112,14 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], PlacesController.prototype, "delete", null);
 __decorate([
+    (0, common_1.Post)(':id/bookmark'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], PlacesController.prototype, "toggleBookmark", null);
+__decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.Get)('user/:userId'),
     __param(0, (0, common_1.Param)('userId', common_1.ParseUUIDPipe)),
@@ -115,6 +131,7 @@ __decorate([
 ], PlacesController.prototype, "getUserPlaces", null);
 exports.PlacesController = PlacesController = __decorate([
     (0, common_1.Controller)('places'),
-    __metadata("design:paramtypes", [places_service_1.PlacesService])
+    __metadata("design:paramtypes", [places_service_1.PlacesService,
+        media_service_1.MediaService])
 ], PlacesController);
 //# sourceMappingURL=places.controller.js.map

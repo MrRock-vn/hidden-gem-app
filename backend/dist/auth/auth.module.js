@@ -28,12 +28,15 @@ exports.AuthModule = AuthModule = __decorate([
             jwt_1.JwtModule.registerAsync({
                 imports: [config_1.ConfigModule],
                 inject: [config_1.ConfigService],
-                useFactory: (configService) => ({
-                    secret: configService.get('JWT_SECRET'),
-                    signOptions: {
-                        expiresIn: configService.get('JWT_EXPIRES_IN', '7d'),
-                    },
-                }),
+                useFactory: async (configService) => {
+                    const expiresIn = configService.get('JWT_EXPIRES_IN') || '7d';
+                    return {
+                        secret: configService.get('JWT_SECRET'),
+                        signOptions: {
+                            expiresIn: expiresIn,
+                        },
+                    };
+                },
             }),
         ],
         controllers: [auth_controller_1.AuthController],

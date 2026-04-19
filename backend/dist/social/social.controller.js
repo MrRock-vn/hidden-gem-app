@@ -39,7 +39,7 @@ let SocialController = class SocialController {
         return this.socialService.followUser(followerId, followingId);
     }
     async unfollowUser(followerId, followingId) {
-        return this.socialService.followUser(followerId, followingId);
+        return this.socialService.unfollowUser(followerId, followingId);
     }
     async getFollowers(userId, page, limit) {
         return this.socialService.getFollowers(userId, page ? +page : undefined, limit ? +limit : undefined);

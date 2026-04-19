@@ -17,20 +17,26 @@ export class PushNotificationService {
         'FIREBASE_SERVICE_ACCOUNT_PATH',
       );
 
-      if (!serviceAccountPath) {
+      if (!serviceAccountPath || serviceAccountPath.includes('${{')) {
         this.logger.warn(
           'FIREBASE_SERVICE_ACCOUNT_PATH not configured. Push notifications disabled.',
         );
         return;
       }
 
-      const serviceAccount = require(serviceAccountPath);
+      try {
+        const serviceAccount = require(serviceAccountPath);
 
-      this.firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-      });
+        this.firebaseApp = admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+        });
 
-      this.logger.log('Firebase initialized successfully');
+        this.logger.log('Firebase initialized successfully');
+      } catch (fileError) {
+        this.logger.warn(
+          `Firebase service account file not found at ${serviceAccountPath}. Push notifications disabled.`,
+        );
+      }
     } catch (error) {
       this.logger.error('Failed to initialize Firebase:', error);
     }

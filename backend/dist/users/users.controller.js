@@ -16,13 +16,16 @@ exports.UsersController = void 0;
 const common_1 = require("@nestjs/common");
 const platform_express_1 = require("@nestjs/platform-express");
 const users_service_1 = require("./users.service");
+const media_service_1 = require("../media/media.service");
 const update_user_dto_1 = require("./dto/update-user.dto");
 const current_user_decorator_1 = require("../auth/decorators/current-user.decorator");
 const public_decorator_1 = require("../auth/decorators/public.decorator");
 let UsersController = class UsersController {
     usersService;
-    constructor(usersService) {
+    mediaService;
+    constructor(usersService, mediaService) {
         this.usersService = usersService;
+        this.mediaService = mediaService;
     }
     async getUser(id, currentUserId) {
         return this.usersService.getProfile(id, currentUserId);
@@ -31,11 +34,29 @@ let UsersController = class UsersController {
         return this.usersService.updateProfile(userId, updateUserDto);
     }
     async updateAvatar(userId, file) {
-        const avatarUrl = `/uploads/avatars/${file.filename}`;
+        if (!file) {
+            throw new Error('Không có file ảnh');
+        }
+        const avatarUrl = await this.mediaService.processAvatar(file);
         return this.usersService.updateAvatar(userId, avatarUrl);
+    }
+    async getSettings(userId) {
+        return this.usersService.getSettings(userId);
+    }
+    async updateSettings(userId, settings) {
+        return this.usersService.updateSettings(userId, settings);
     }
     async blockUser(blockerId, blockedId) {
         return this.usersService.blockUser(blockerId, blockedId);
+    }
+    async registerDeviceToken(userId, token) {
+        if (!token || token.trim().length === 0) {
+            throw new Error('Token không hợp lệ');
+        }
+        return this.usersService.updateDeviceToken(userId, token);
+    }
+    async unregisterDeviceToken(userId) {
+        return this.usersService.updateDeviceToken(userId, null);
     }
 };
 exports.UsersController = UsersController;
@@ -66,6 +87,21 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "updateAvatar", null);
 __decorate([
+    (0, common_1.Get)('me/settings'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "getSettings", null);
+__decorate([
+    (0, common_1.Patch)('me/settings'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "updateSettings", null);
+__decorate([
     (0, common_1.Post)(':id/block'),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
@@ -73,8 +109,24 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "blockUser", null);
+__decorate([
+    (0, common_1.Post)('me/device-token'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Body)('token')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "registerDeviceToken", null);
+__decorate([
+    (0, common_1.Delete)('me/device-token'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "unregisterDeviceToken", null);
 exports.UsersController = UsersController = __decorate([
     (0, common_1.Controller)('users'),
-    __metadata("design:paramtypes", [users_service_1.UsersService])
+    __metadata("design:paramtypes", [users_service_1.UsersService,
+        media_service_1.MediaService])
 ], UsersController);
 //# sourceMappingURL=users.controller.js.map

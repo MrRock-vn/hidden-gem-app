@@ -19,6 +19,10 @@ const places_module_1 = require("./places/places.module");
 const social_module_1 = require("./social/social.module");
 const bookmarks_module_1 = require("./bookmarks/bookmarks.module");
 const notifications_module_1 = require("./notifications/notifications.module");
+const search_module_1 = require("./search/search.module");
+const realtime_module_1 = require("./realtime/realtime.module");
+const queue_module_1 = require("./queue/queue.module");
+const config_module_1 = require("./config/config.module");
 const jwt_auth_guard_1 = require("./auth/guards/jwt-auth.guard");
 const user_entity_1 = require("./users/entities/user.entity");
 const place_entity_1 = require("./places/entities/place.entity");
@@ -76,6 +80,10 @@ exports.AppModule = AppModule = __decorate([
             social_module_1.SocialModule,
             bookmarks_module_1.BookmarksModule,
             notifications_module_1.NotificationsModule,
+            search_module_1.SearchModule,
+            realtime_module_1.RealtimeModule,
+            queue_module_1.QueueModule,
+            config_module_1.AppConfigModule,
         ],
         providers: [
             {

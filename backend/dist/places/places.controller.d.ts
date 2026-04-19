@@ -1,9 +1,11 @@
 import { PlacesService } from './places.service';
+import { MediaService } from '../media/media.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { QueryPlaceDto } from './dto/query-place.dto';
 export declare class PlacesController {
     private readonly placesService;
-    constructor(placesService: PlacesService);
+    private readonly mediaService;
+    constructor(placesService: PlacesService, mediaService: MediaService);
     findAll(query: QueryPlaceDto): Promise<{
         data: {
             user: {
@@ -18,6 +20,7 @@ export declare class PlacesController {
             category: string;
             latitude: number;
             longitude: number;
+            location: string;
             address: string;
             tags: string[];
             is_published: boolean;
@@ -50,6 +53,7 @@ export declare class PlacesController {
             category: string;
             latitude: number;
             longitude: number;
+            location: string;
             address: string;
             tags: string[];
             is_published: boolean;
@@ -83,6 +87,7 @@ export declare class PlacesController {
         category: string;
         latitude: number;
         longitude: number;
+        location: string;
         address: string;
         tags: string[];
         is_published: boolean;
@@ -93,7 +98,7 @@ export declare class PlacesController {
         images: import("./entities/place-image.entity").PlaceImage[];
         comments: import("../social/entities/comment.entity").Comment[];
     }>;
-    create(userId: string, createPlaceDto: CreatePlaceDto, files?: any[]): Promise<{
+    create(userId: string, createPlaceDto: CreatePlaceDto, files?: Express.Multer.File[]): Promise<{
         user: {
             id: string;
             username: string;
@@ -108,6 +113,7 @@ export declare class PlacesController {
         category: string;
         latitude: number;
         longitude: number;
+        location: string;
         address: string;
         tags: string[];
         is_published: boolean;
@@ -124,6 +130,10 @@ export declare class PlacesController {
     }>;
     delete(placeId: string, userId: string): Promise<{
         message: string;
+    }>;
+    toggleBookmark(userId: string, placeId: string): Promise<{
+        bookmarked: boolean;
+        bookmark_count: number;
     }>;
     getUserPlaces(userId: string, page?: number, limit?: number): Promise<{
         data: import("./entities/place.entity").Place[];

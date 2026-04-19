@@ -20,16 +20,23 @@ const place_entity_1 = require("./entities/place.entity");
 const place_image_entity_1 = require("./entities/place-image.entity");
 const like_entity_1 = require("../social/entities/like.entity");
 const bookmark_entity_1 = require("../bookmarks/entities/bookmark.entity");
+const bookmark_collection_entity_1 = require("../bookmarks/entities/bookmark-collection.entity");
+const user_entity_1 = require("../users/entities/user.entity");
+const push_notification_service_1 = require("../notifications/push-notification.service");
 let PlacesService = class PlacesService {
     placesRepository;
     placeImagesRepository;
     likesRepository;
     bookmarksRepository;
-    constructor(placesRepository, placeImagesRepository, likesRepository, bookmarksRepository) {
+    usersRepository;
+    pushNotificationService;
+    constructor(placesRepository, placeImagesRepository, likesRepository, bookmarksRepository, usersRepository, pushNotificationService) {
         this.placesRepository = placesRepository;
         this.placeImagesRepository = placeImagesRepository;
         this.likesRepository = likesRepository;
         this.bookmarksRepository = bookmarksRepository;
+        this.usersRepository = usersRepository;
+        this.pushNotificationService = pushNotificationService;
     }
     async create(userId, createPlaceDto, imageUrls = []) {
         const place = this.placesRepository.create({
@@ -37,6 +44,16 @@ let PlacesService = class PlacesService {
             user_id: userId,
         });
         const savedPlace = await this.placesRepository.save(place);
+        if (savedPlace.latitude && savedPlace.longitude) {
+            await this.placesRepository
+                .createQueryBuilder()
+                .update(place_entity_1.Place)
+                .set({
+                location: () => `ST_SetSRID(ST_MakePoint(${savedPlace.longitude}, ${savedPlace.latitude}), 4326)`,
+            })
+                .where('id = :id', { id: savedPlace.id })
+                .execute();
+        }
         if (imageUrls.length > 0) {
             const images = imageUrls.map((url, index) => this.placeImagesRepository.create({
                 place_id: savedPlace.id,
@@ -48,7 +65,7 @@ let PlacesService = class PlacesService {
         return this.findById(savedPlace.id);
     }
     async findAll(query) {
-        const { lat, lng, radius = 10, category, page = 1, limit = 20, sort = 'latest' } = query;
+        const { lat, lng, radius = 10, category, page = 1, limit = 20, sort = 'latest', } = query;
         const queryBuilder = this.placesRepository
             .createQueryBuilder('place')
             .leftJoinAndSelect('place.images', 'images')
@@ -82,11 +99,13 @@ let PlacesService = class PlacesService {
         return {
             data: places.map((place) => ({
                 ...place,
-                user: place.user ? {
-                    id: place.user.id,
-                    username: place.user.username,
-                    avatar_url: place.user.avatar_url,
-                } : null,
+                user: place.user
+                    ? {
+                        id: place.user.id,
+                        username: place.user.username,
+                        avatar_url: place.user.avatar_url,
+                    }
+                    : null,
             })),
             meta: {
                 page,
@@ -121,11 +140,13 @@ let PlacesService = class PlacesService {
         }
         return {
             ...place,
-            user: place.user ? {
-                id: place.user.id,
-                username: place.user.username,
-                avatar_url: place.user.avatar_url,
-            } : null,
+            user: place.user
+                ? {
+                    id: place.user.id,
+                    username: place.user.username,
+                    avatar_url: place.user.avatar_url,
+                }
+                : null,
             is_liked: isLiked,
             is_bookmarked: isBookmarked,
         };
@@ -134,7 +155,10 @@ let PlacesService = class PlacesService {
         return this.findAll({ lat, lng, radius, sort: 'nearest', limit, page: 1 });
     }
     async toggleLike(userId, placeId) {
-        const place = await this.placesRepository.findOne({ where: { id: placeId } });
+        const place = await this.placesRepository.findOne({
+            where: { id: placeId },
+            relations: ['user'],
+        });
         if (!place) {
             throw new common_1.NotFoundException('Không tìm thấy địa điểm');
         }
@@ -152,6 +176,14 @@ let PlacesService = class PlacesService {
         });
         await this.likesRepository.save(like);
         await this.placesRepository.increment({ id: placeId }, 'like_count', 1);
+        if (place.user && place.user.id !== userId) {
+            const owner = await this.usersRepository.findOne({
+                where: { id: place.user.id },
+            });
+            if (owner?.device_token && owner.push_notifications_enabled) {
+                await this.pushNotificationService.notifyNewLike(place.user.id, place.title, placeId);
+            }
+        }
         return { liked: true, like_count: place.like_count + 1 };
     }
     async deletePlace(placeId, userId) {
@@ -163,6 +195,42 @@ let PlacesService = class PlacesService {
         }
         await this.placesRepository.remove(place);
         return { message: 'Đã xóa địa điểm' };
+    }
+    async toggleBookmark(userId, placeId) {
+        const place = await this.placesRepository.findOne({
+            where: { id: placeId },
+        });
+        if (!place) {
+            throw new common_1.NotFoundException('Không tìm thấy địa điểm');
+        }
+        const existingBookmark = await this.bookmarksRepository.findOne({
+            where: { place_id: placeId },
+            relations: ['collection'],
+        });
+        if (existingBookmark && existingBookmark.collection?.user_id === userId) {
+            await this.bookmarksRepository.remove(existingBookmark);
+            await this.placesRepository.decrement({ id: placeId }, 'bookmark_count', 1);
+            return { bookmarked: false, bookmark_count: place.bookmark_count - 1 };
+        }
+        const collectionRepo = this.bookmarksRepository.manager.getRepository(bookmark_collection_entity_1.BookmarkCollection);
+        let defaultCollection = await collectionRepo.findOne({
+            where: { user_id: userId, name: 'Yêu thích' },
+        });
+        if (!defaultCollection) {
+            defaultCollection = collectionRepo.create({
+                user_id: userId,
+                name: 'Yêu thích',
+                is_public: false,
+            });
+            await collectionRepo.save(defaultCollection);
+        }
+        const bookmark = this.bookmarksRepository.create({
+            collection_id: defaultCollection.id,
+            place_id: placeId,
+        });
+        await this.bookmarksRepository.save(bookmark);
+        await this.placesRepository.increment({ id: placeId }, 'bookmark_count', 1);
+        return { bookmarked: true, bookmark_count: place.bookmark_count + 1 };
     }
     async getUserPlaces(userId, page = 1, limit = 20) {
         const [places, total] = await this.placesRepository.findAndCount({
@@ -191,9 +259,12 @@ exports.PlacesService = PlacesService = __decorate([
     __param(1, (0, typeorm_1.InjectRepository)(place_image_entity_1.PlaceImage)),
     __param(2, (0, typeorm_1.InjectRepository)(like_entity_1.Like)),
     __param(3, (0, typeorm_1.InjectRepository)(bookmark_entity_1.Bookmark)),
+    __param(4, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
-        typeorm_2.Repository])
+        typeorm_2.Repository,
+        typeorm_2.Repository,
+        push_notification_service_1.PushNotificationService])
 ], PlacesService);
 //# sourceMappingURL=places.service.js.map

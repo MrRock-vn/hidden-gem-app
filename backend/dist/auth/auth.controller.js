@@ -34,6 +34,9 @@ let AuthController = class AuthController {
     async googleAuth(googleAuthDto) {
         return this.authService.googleAuth(googleAuthDto.token);
     }
+    async appleAuth(appleAuthDto) {
+        return this.authService.appleAuth(appleAuthDto.token);
+    }
     async refreshToken(refreshToken) {
         return this.authService.refreshToken(refreshToken);
     }
@@ -67,6 +70,14 @@ __decorate([
     __metadata("design:paramtypes", [google_auth_dto_1.GoogleAuthDto]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "googleAuth", null);
+__decorate([
+    (0, public_decorator_1.Public)(),
+    (0, common_1.Post)('apple'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [google_auth_dto_1.GoogleAuthDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "appleAuth", null);
 __decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.Post)('refresh'),

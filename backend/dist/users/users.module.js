@@ -9,8 +9,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersModule = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
 const users_service_1 = require("./users.service");
 const users_controller_1 = require("./users.controller");
+const media_module_1 = require("../media/media.module");
 const user_entity_1 = require("./entities/user.entity");
 const follow_entity_1 = require("../social/entities/follow.entity");
 const block_entity_1 = require("../social/entities/block.entity");
@@ -19,7 +22,24 @@ let UsersModule = class UsersModule {
 exports.UsersModule = UsersModule;
 exports.UsersModule = UsersModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, follow_entity_1.Follow, block_entity_1.Block])],
+        imports: [
+            typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, follow_entity_1.Follow, block_entity_1.Block]),
+            media_module_1.MediaModule,
+            platform_express_1.MulterModule.register({
+                storage: (0, multer_1.memoryStorage)(),
+                fileFilter: (req, file, cb) => {
+                    if (file.mimetype.match(/\/(jpg|jpeg|png|gif|webp)$/)) {
+                        cb(null, true);
+                    }
+                    else {
+                        cb(new Error('Chỉ chấp nhận file ảnh'), false);
+                    }
+                },
+                limits: {
+                    fileSize: 5 * 1024 * 1024,
+                },
+            }),
+        ],
         controllers: [users_controller_1.UsersController],
         providers: [users_service_1.UsersService],
         exports: [users_service_1.UsersService],

@@ -3,13 +3,19 @@ import { Comment } from './entities/comment.entity';
 import { Follow } from './entities/follow.entity';
 import { Like } from './entities/like.entity';
 import { Place } from '../places/entities/place.entity';
+import { User } from '../users/entities/user.entity';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { PushNotificationService } from '../notifications/push-notification.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 export declare class SocialService {
     private commentsRepository;
     private followsRepository;
     private likesRepository;
     private placesRepository;
-    constructor(commentsRepository: Repository<Comment>, followsRepository: Repository<Follow>, likesRepository: Repository<Like>, placesRepository: Repository<Place>);
+    private usersRepository;
+    private realtimeGateway;
+    private pushNotificationService;
+    constructor(commentsRepository: Repository<Comment>, followsRepository: Repository<Follow>, likesRepository: Repository<Like>, placesRepository: Repository<Place>, usersRepository: Repository<User>, realtimeGateway: RealtimeGateway, pushNotificationService: PushNotificationService);
     getPlaceComments(placeId: string, page?: number, limit?: number): Promise<{
         data: {
             user: {
@@ -60,6 +66,9 @@ export declare class SocialService {
         like_count: number;
     }>;
     followUser(followerId: string, followingId: string): Promise<{
+        following: boolean;
+    }>;
+    unfollowUser(followerId: string, followingId: string): Promise<{
         following: boolean;
     }>;
     getFollowers(userId: string, page?: number, limit?: number): Promise<{

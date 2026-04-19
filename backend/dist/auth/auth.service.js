@@ -47,17 +47,26 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const jwt_1 = require("@nestjs/jwt");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const bcrypt = __importStar(require("bcrypt"));
+const google_auth_library_1 = require("google-auth-library");
 const user_entity_1 = require("../users/entities/user.entity");
 let AuthService = class AuthService {
     usersRepository;
     jwtService;
-    constructor(usersRepository, jwtService) {
+    configService;
+    googleClient;
+    constructor(usersRepository, jwtService, configService) {
         this.usersRepository = usersRepository;
         this.jwtService = jwtService;
+        this.configService = configService;
+        const googleClientId = this.configService.get('GOOGLE_CLIENT_ID');
+        if (googleClientId) {
+            this.googleClient = new google_auth_library_1.OAuth2Client(googleClientId);
+        }
     }
     async register(registerDto) {
         const { username, email, password } = registerDto;
@@ -107,43 +116,98 @@ let AuthService = class AuthService {
             ...tokens,
         };
     }
-    async googleAuth(googleToken) {
+    async googleAuth(token) {
         try {
-            const mockGoogleUser = {
-                google_id: 'google_' + Date.now(),
-                email: `user${Date.now()}@gmail.com`,
-                username: `user_${Date.now()}`,
-                avatar_url: undefined,
-            };
+            if (!this.googleClient) {
+                throw new common_1.BadRequestException('Google OAuth not configured');
+            }
+            const ticket = await this.googleClient.verifyIdToken({
+                idToken: token,
+                audience: this.configService.get('GOOGLE_CLIENT_ID'),
+            });
+            const payload = ticket.getPayload();
+            if (!payload) {
+                throw new common_1.BadRequestException('Invalid Google token');
+            }
+            const { sub: googleId, email, name, picture } = payload;
             let user = await this.usersRepository.findOne({
-                where: { google_id: mockGoogleUser.google_id },
+                where: { google_id: googleId },
             });
             if (!user) {
-                user = await this.usersRepository.findOne({
-                    where: { email: mockGoogleUser.email },
+                const existingUser = await this.usersRepository.findOne({
+                    where: { email: email },
                 });
-                if (user) {
-                    user.google_id = mockGoogleUser.google_id;
-                    await this.usersRepository.save(user);
+                if (existingUser) {
+                    existingUser.google_id = googleId;
+                    user = await this.usersRepository.save(existingUser);
                 }
                 else {
                     user = this.usersRepository.create({
-                        username: mockGoogleUser.username,
-                        email: mockGoogleUser.email,
-                        google_id: mockGoogleUser.google_id,
-                        avatar_url: mockGoogleUser.avatar_url,
+                        email: email,
+                        username: name || email?.split('@')[0] || 'user_' + Date.now(),
+                        google_id: googleId,
+                        avatar_url: picture || undefined,
                     });
-                    await this.usersRepository.save(user);
+                    user = await this.usersRepository.save(user);
                 }
             }
             const tokens = await this.generateTokens(user);
+            await this.usersRepository.update(user.id, {
+                refresh_token: tokens.refreshToken,
+            });
             return {
                 user: this.sanitizeUser(user),
-                ...tokens,
+                accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
             };
         }
         catch (error) {
-            throw new common_1.BadRequestException('Google authentication thất bại');
+            console.error('Google auth error:', error);
+            throw new common_1.BadRequestException('Google authentication failed');
+        }
+    }
+    async appleAuth(token) {
+        try {
+            const decoded = this.jwtService.decode(token);
+            if (!decoded) {
+                throw new common_1.BadRequestException('Invalid Apple token');
+            }
+            const { sub: appleId, email } = decoded;
+            let user = await this.usersRepository.findOne({
+                where: { apple_id: appleId },
+            });
+            if (!user) {
+                if (email) {
+                    const existingUser = await this.usersRepository.findOne({
+                        where: { email },
+                    });
+                    if (existingUser) {
+                        existingUser.apple_id = appleId;
+                        user = await this.usersRepository.save(existingUser);
+                    }
+                }
+                if (!user) {
+                    user = this.usersRepository.create({
+                        email: email || `apple_${appleId}@hidden-gem.local`,
+                        username: `apple_user_${Date.now()}`,
+                        apple_id: appleId,
+                    });
+                    user = await this.usersRepository.save(user);
+                }
+            }
+            const tokens = await this.generateTokens(user);
+            await this.usersRepository.update(user.id, {
+                refresh_token: tokens.refreshToken,
+            });
+            return {
+                user: this.sanitizeUser(user),
+                accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
+            };
+        }
+        catch (error) {
+            console.error('Apple auth error:', error);
+            throw new common_1.BadRequestException('Apple authentication failed');
         }
     }
     async refreshToken(refreshToken) {
@@ -166,7 +230,9 @@ let AuthService = class AuthService {
         }
     }
     async logout(userId) {
-        await this.usersRepository.update(userId, { refresh_token: undefined });
+        await this.usersRepository.update(userId, {
+            refresh_token: undefined,
+        });
         return { message: 'Đăng xuất thành công' };
     }
     async generateTokens(user) {
@@ -187,6 +253,7 @@ exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
-        jwt_1.JwtService])
+        jwt_1.JwtService,
+        config_1.ConfigService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

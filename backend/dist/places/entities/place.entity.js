@@ -23,6 +23,7 @@ let Place = class Place {
     category;
     latitude;
     longitude;
+    location;
     address;
     tags;
     is_published;
@@ -67,6 +68,15 @@ __decorate([
     (0, typeorm_1.Column)({ type: 'float' }),
     __metadata("design:type", Number)
 ], Place.prototype, "longitude", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        type: 'geography',
+        spatialFeatureType: 'Point',
+        srid: 4326,
+        nullable: true,
+    }),
+    __metadata("design:type", String)
+], Place.prototype, "location", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'text', nullable: true }),
     __metadata("design:type", String)

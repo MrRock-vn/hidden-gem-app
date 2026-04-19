@@ -20,16 +20,25 @@ const comment_entity_1 = require("./entities/comment.entity");
 const follow_entity_1 = require("./entities/follow.entity");
 const like_entity_1 = require("./entities/like.entity");
 const place_entity_1 = require("../places/entities/place.entity");
+const user_entity_1 = require("../users/entities/user.entity");
+const realtime_gateway_1 = require("../realtime/realtime.gateway");
+const push_notification_service_1 = require("../notifications/push-notification.service");
 let SocialService = class SocialService {
     commentsRepository;
     followsRepository;
     likesRepository;
     placesRepository;
-    constructor(commentsRepository, followsRepository, likesRepository, placesRepository) {
+    usersRepository;
+    realtimeGateway;
+    pushNotificationService;
+    constructor(commentsRepository, followsRepository, likesRepository, placesRepository, usersRepository, realtimeGateway, pushNotificationService) {
         this.commentsRepository = commentsRepository;
         this.followsRepository = followsRepository;
         this.likesRepository = likesRepository;
         this.placesRepository = placesRepository;
+        this.usersRepository = usersRepository;
+        this.realtimeGateway = realtimeGateway;
+        this.pushNotificationService = pushNotificationService;
     }
     async getPlaceComments(placeId, page = 1, limit = 20) {
         const [comments, total] = await this.commentsRepository.findAndCount({
@@ -42,21 +51,38 @@ let SocialService = class SocialService {
         return {
             data: comments.map((c) => ({
                 ...c,
-                user: c.user ? { id: c.user.id, username: c.user.username, avatar_url: c.user.avatar_url } : null,
+                user: c.user
+                    ? {
+                        id: c.user.id,
+                        username: c.user.username,
+                        avatar_url: c.user.avatar_url,
+                    }
+                    : null,
                 replies: c.replies?.map((r) => ({
                     ...r,
-                    user: r.user ? { id: r.user.id, username: r.user.username, avatar_url: r.user.avatar_url } : null,
+                    user: r.user
+                        ? {
+                            id: r.user.id,
+                            username: r.user.username,
+                            avatar_url: r.user.avatar_url,
+                        }
+                        : null,
                 })),
             })),
             meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
         };
     }
     async createComment(userId, placeId, dto) {
-        const place = await this.placesRepository.findOne({ where: { id: placeId } });
+        const place = await this.placesRepository.findOne({
+            where: { id: placeId },
+            relations: ['user'],
+        });
         if (!place)
             throw new common_1.NotFoundException('Không tìm thấy địa điểm');
         if (dto.parent_id) {
-            const parent = await this.commentsRepository.findOne({ where: { id: dto.parent_id, place_id: placeId } });
+            const parent = await this.commentsRepository.findOne({
+                where: { id: dto.parent_id, place_id: placeId },
+            });
             if (!parent)
                 throw new common_1.NotFoundException('Không tìm thấy bình luận gốc');
         }
@@ -68,23 +94,61 @@ let SocialService = class SocialService {
         });
         const saved = await this.commentsRepository.save(comment);
         await this.placesRepository.increment({ id: placeId }, 'comment_count', 1);
-        return this.commentsRepository.findOne({
+        const fullComment = await this.commentsRepository.findOne({
             where: { id: saved.id },
             relations: ['user'],
         });
+        this.realtimeGateway.emitNewComment(placeId, {
+            id: fullComment.id,
+            content: fullComment.content,
+            created_at: fullComment.created_at,
+            parent_id: fullComment.parent_id,
+            user: {
+                id: fullComment.user.id,
+                username: fullComment.user.username,
+                avatar_url: fullComment.user.avatar_url,
+            },
+        });
+        if (place.user && place.user.id !== userId) {
+            const owner = await this.usersRepository.findOne({
+                where: { id: place.user.id },
+            });
+            if (owner?.device_token && owner.push_notifications_enabled) {
+                await this.pushNotificationService.notifyNewComment(place.user.id, place.title, fullComment.user.username, dto.content, placeId);
+            }
+        }
+        if (dto.mentioned_usernames && dto.mentioned_usernames.length > 0) {
+            const mentionedUsers = await this.usersRepository.find({
+                where: dto.mentioned_usernames.map((username) => ({ username })),
+            });
+            for (const user of mentionedUsers) {
+                if (user.id !== userId &&
+                    user.device_token &&
+                    user.push_notifications_enabled) {
+                    await this.pushNotificationService.notifyMention(user.id, fullComment.user.username, dto.content, placeId, 'comment');
+                }
+            }
+        }
+        return fullComment;
     }
     async deleteComment(commentId, userId) {
-        const comment = await this.commentsRepository.findOne({ where: { id: commentId } });
+        const comment = await this.commentsRepository.findOne({
+            where: { id: commentId },
+        });
         if (!comment)
             throw new common_1.NotFoundException('Không tìm thấy bình luận');
         if (comment.user_id !== userId)
             throw new common_1.ForbiddenException('Không có quyền xóa');
+        const placeId = comment.place_id;
         await this.commentsRepository.remove(comment);
-        await this.placesRepository.decrement({ id: comment.place_id }, 'comment_count', 1);
+        await this.placesRepository.decrement({ id: placeId }, 'comment_count', 1);
+        this.realtimeGateway.emitCommentDeleted(placeId, commentId);
         return { message: 'Đã xóa bình luận' };
     }
     async likeComment(userId, commentId) {
-        const comment = await this.commentsRepository.findOne({ where: { id: commentId } });
+        const comment = await this.commentsRepository.findOne({
+            where: { id: commentId },
+        });
         if (!comment)
             throw new common_1.NotFoundException('Không tìm thấy bình luận');
         comment.like_count += 1;
@@ -107,7 +171,28 @@ let SocialService = class SocialService {
             following_id: followingId,
         });
         await this.followsRepository.save(follow);
+        const follower = await this.usersRepository.findOne({
+            where: { id: followerId },
+        });
+        const followingUser = await this.usersRepository.findOne({
+            where: { id: followingId },
+        });
+        if (followingUser?.device_token &&
+            followingUser.push_notifications_enabled &&
+            follower) {
+            await this.pushNotificationService.notifyNewFollower(followingId, follower.username);
+        }
         return { following: true };
+    }
+    async unfollowUser(followerId, followingId) {
+        const existing = await this.followsRepository.findOne({
+            where: { follower_id: followerId, following_id: followingId },
+        });
+        if (!existing) {
+            throw new common_1.NotFoundException('Chưa follow người dùng này');
+        }
+        await this.followsRepository.remove(existing);
+        return { following: false };
     }
     async getFollowers(userId, page = 1, limit = 20) {
         const [follows, total] = await this.followsRepository.findAndCount({
@@ -155,9 +240,13 @@ exports.SocialService = SocialService = __decorate([
     __param(1, (0, typeorm_1.InjectRepository)(follow_entity_1.Follow)),
     __param(2, (0, typeorm_1.InjectRepository)(like_entity_1.Like)),
     __param(3, (0, typeorm_1.InjectRepository)(place_entity_1.Place)),
+    __param(4, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
-        typeorm_2.Repository])
+        typeorm_2.Repository,
+        typeorm_2.Repository,
+        realtime_gateway_1.RealtimeGateway,
+        push_notification_service_1.PushNotificationService])
 ], SocialService);
 //# sourceMappingURL=social.service.js.map

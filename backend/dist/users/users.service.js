@@ -82,6 +82,27 @@ let UsersService = class UsersService {
         await this.usersRepository.update(userId, { avatar_url: avatarUrl });
         return this.findById(userId);
     }
+    async getSettings(userId) {
+        const user = await this.usersRepository.findOne({ where: { id: userId } });
+        if (!user)
+            throw new common_1.NotFoundException('Không tìm thấy người dùng');
+        return {
+            push_notifications: true,
+            is_private: user.is_private,
+            dark_mode: true,
+            email: user.email,
+        };
+    }
+    async updateSettings(userId, settings) {
+        const updateData = {};
+        if (settings.is_private !== undefined) {
+            updateData.is_private = settings.is_private;
+        }
+        if (Object.keys(updateData).length > 0) {
+            await this.usersRepository.update(userId, updateData);
+        }
+        return this.getSettings(userId);
+    }
     async blockUser(blockerId, blockedId) {
         if (blockerId === blockedId) {
             throw new common_1.ConflictException('Không thể tự block bản thân');
@@ -99,10 +120,26 @@ let UsersService = class UsersService {
         });
         await Promise.all([
             this.blocksRepository.save(block),
-            this.followsRepository.delete({ follower_id: blockerId, following_id: blockedId }),
-            this.followsRepository.delete({ follower_id: blockedId, following_id: blockerId }),
+            this.followsRepository.delete({
+                follower_id: blockerId,
+                following_id: blockedId,
+            }),
+            this.followsRepository.delete({
+                follower_id: blockedId,
+                following_id: blockerId,
+            }),
         ]);
         return { blocked: true };
+    }
+    async updateDeviceToken(userId, deviceToken) {
+        const updateData = {
+            device_token: deviceToken === null ? null : deviceToken,
+        };
+        await this.usersRepository.update(userId, updateData);
+        return {
+            success: true,
+            message: deviceToken ? 'Device token registered' : 'Device token removed',
+        };
     }
     sanitizeUser(user) {
         const { password, refresh_token, google_id, apple_id, ...sanitized } = user;

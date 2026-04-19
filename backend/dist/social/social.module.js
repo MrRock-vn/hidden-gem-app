@@ -11,17 +11,24 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const social_service_1 = require("./social.service");
 const social_controller_1 = require("./social.controller");
+const realtime_module_1 = require("../realtime/realtime.module");
+const notifications_module_1 = require("../notifications/notifications.module");
 const comment_entity_1 = require("./entities/comment.entity");
 const follow_entity_1 = require("./entities/follow.entity");
 const like_entity_1 = require("./entities/like.entity");
 const block_entity_1 = require("./entities/block.entity");
 const place_entity_1 = require("../places/entities/place.entity");
+const user_entity_1 = require("../users/entities/user.entity");
 let SocialModule = class SocialModule {
 };
 exports.SocialModule = SocialModule;
 exports.SocialModule = SocialModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([comment_entity_1.Comment, follow_entity_1.Follow, like_entity_1.Like, block_entity_1.Block, place_entity_1.Place])],
+        imports: [
+            typeorm_1.TypeOrmModule.forFeature([comment_entity_1.Comment, follow_entity_1.Follow, like_entity_1.Like, block_entity_1.Block, place_entity_1.Place, user_entity_1.User]),
+            realtime_module_1.RealtimeModule,
+            notifications_module_1.NotificationsModule,
+        ],
         controllers: [social_controller_1.SocialController],
         providers: [social_service_1.SocialService],
         exports: [social_service_1.SocialService],

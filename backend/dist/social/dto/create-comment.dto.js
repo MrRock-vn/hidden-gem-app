@@ -14,6 +14,7 @@ const class_validator_1 = require("class-validator");
 class CreateCommentDto {
     content;
     parent_id;
+    mentioned_usernames;
 }
 exports.CreateCommentDto = CreateCommentDto;
 __decorate([
@@ -26,4 +27,10 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateCommentDto.prototype, "parent_id", void 0);
+__decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], CreateCommentDto.prototype, "mentioned_usernames", void 0);
 //# sourceMappingURL=create-comment.dto.js.map
