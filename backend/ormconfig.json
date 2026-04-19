@@ -1,0 +1,24 @@
+{
+  "type": "postgres",
+  "host": "${DATABASE_HOST}",
+  "port": "${DATABASE_PORT}",
+  "username": "${DATABASE_USER}",
+  "password": "${DATABASE_PASSWORD}",
+  "database": "${DATABASE_NAME}",
+  "entities": ["src/**/*.entity.ts"],
+  "migrations": ["src/migrations/**/*.ts"],
+  "seeds": ["src/seeds/**/*.ts"],
+  "migrationsTableName": "typeorm_migrations",
+  "cli": {
+    "entitiesDir": "src",
+    "migrationsDir": "src/migrations",
+    "seedersDir": "src/seeds"
+  },
+  "synchronize": false,
+  "logging": true,
+  "logger": "advanced-console",
+  "maxQueryExecutionTime": 1000,
+  "ssl": {
+    "rejectUnauthorized": false
+  }
+}

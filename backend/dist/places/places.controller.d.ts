@@ -1,0 +1,138 @@
+import { PlacesService } from './places.service';
+import { CreatePlaceDto } from './dto/create-place.dto';
+import { QueryPlaceDto } from './dto/query-place.dto';
+export declare class PlacesController {
+    private readonly placesService;
+    constructor(placesService: PlacesService);
+    findAll(query: QueryPlaceDto): Promise<{
+        data: {
+            user: {
+                id: string;
+                username: string;
+                avatar_url: string | undefined;
+            } | null;
+            id: string;
+            user_id: string;
+            title: string;
+            description: string;
+            category: string;
+            latitude: number;
+            longitude: number;
+            address: string;
+            tags: string[];
+            is_published: boolean;
+            like_count: number;
+            comment_count: number;
+            bookmark_count: number;
+            created_at: Date;
+            images: import("./entities/place-image.entity").PlaceImage[];
+            comments: import("../social/entities/comment.entity").Comment[];
+        }[];
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasMore: boolean;
+        };
+    }>;
+    findNearby(lat: number, lng: number, radius?: number, limit?: number): Promise<{
+        data: {
+            user: {
+                id: string;
+                username: string;
+                avatar_url: string | undefined;
+            } | null;
+            id: string;
+            user_id: string;
+            title: string;
+            description: string;
+            category: string;
+            latitude: number;
+            longitude: number;
+            address: string;
+            tags: string[];
+            is_published: boolean;
+            like_count: number;
+            comment_count: number;
+            bookmark_count: number;
+            created_at: Date;
+            images: import("./entities/place-image.entity").PlaceImage[];
+            comments: import("../social/entities/comment.entity").Comment[];
+        }[];
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasMore: boolean;
+        };
+    }>;
+    findOne(id: string, currentUserId?: string): Promise<{
+        user: {
+            id: string;
+            username: string;
+            avatar_url: string | undefined;
+        } | null;
+        is_liked: boolean;
+        is_bookmarked: boolean;
+        id: string;
+        user_id: string;
+        title: string;
+        description: string;
+        category: string;
+        latitude: number;
+        longitude: number;
+        address: string;
+        tags: string[];
+        is_published: boolean;
+        like_count: number;
+        comment_count: number;
+        bookmark_count: number;
+        created_at: Date;
+        images: import("./entities/place-image.entity").PlaceImage[];
+        comments: import("../social/entities/comment.entity").Comment[];
+    }>;
+    create(userId: string, createPlaceDto: CreatePlaceDto, files?: any[]): Promise<{
+        user: {
+            id: string;
+            username: string;
+            avatar_url: string | undefined;
+        } | null;
+        is_liked: boolean;
+        is_bookmarked: boolean;
+        id: string;
+        user_id: string;
+        title: string;
+        description: string;
+        category: string;
+        latitude: number;
+        longitude: number;
+        address: string;
+        tags: string[];
+        is_published: boolean;
+        like_count: number;
+        comment_count: number;
+        bookmark_count: number;
+        created_at: Date;
+        images: import("./entities/place-image.entity").PlaceImage[];
+        comments: import("../social/entities/comment.entity").Comment[];
+    }>;
+    toggleLike(userId: string, placeId: string): Promise<{
+        liked: boolean;
+        like_count: number;
+    }>;
+    delete(placeId: string, userId: string): Promise<{
+        message: string;
+    }>;
+    getUserPlaces(userId: string, page?: number, limit?: number): Promise<{
+        data: import("./entities/place.entity").Place[];
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasMore: boolean;
+        };
+    }>;
+}
