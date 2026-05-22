@@ -2,7 +2,7 @@
 
 > **Ứng dụng cộng đồng chia sẻ địa điểm ít người biết tại địa phương**
 >
-> Khám phá, chia sẻ và lưu lại những địa điểm thú vị, quán cà phê ẩn tại, góc chụp ảnh, và những bí mật địa phương qua mạng xã hội!
+> Khám phá, chia sẻ và lưu lại những địa điểm thú vị, quán cà phê ẩn tại, góc chụp ảnh, và những bí mật địa phương qua mạng xã hội.
 
 ![Build Status](https://img.shields.io/badge/status-active-brightgreen)
 ![Node Version](https://img.shields.io/badge/node-18%2B-green)
