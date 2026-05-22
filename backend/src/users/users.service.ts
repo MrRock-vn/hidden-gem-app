@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -9,6 +11,7 @@ import { User } from './entities/user.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { Follow } from '../social/entities/follow.entity';
 import { Block } from '../social/entities/block.entity';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -85,14 +88,48 @@ export class UsersService {
     return this.findById(userId);
   }
 
+  async updateEmail(userId: string, email: string) {
+    const existing = await this.usersRepository.findOne({ where: { email } });
+    if (existing && existing.id !== userId) {
+      throw new ConflictException('Email da duoc su dung');
+    }
+
+    await this.usersRepository.update(userId, { email });
+    return this.findById(userId);
+  }
+
+  async updatePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Khong tim thay nguoi dung');
+    if (!user.password) {
+      throw new BadRequestException('Tai khoan nay khong co mat khau cuc bo');
+    }
+
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) {
+      throw new UnauthorizedException('Mat khau hien tai khong dung');
+    }
+
+    await this.usersRepository.update(userId, {
+      password: await bcrypt.hash(newPassword, 10),
+      refresh_token: null as any,
+    });
+
+    return { message: 'Da doi mat khau' };
+  }
+
   async getSettings(userId: string) {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
 
     return {
-      push_notifications: true,
+      push_notifications: user.push_notifications_enabled,
       is_private: user.is_private,
-      dark_mode: true,
+      dark_mode: false,
       email: user.email,
     };
   }
@@ -105,10 +142,17 @@ export class UsersService {
       dark_mode?: boolean;
     },
   ) {
-    const updateData: Partial<{ is_private: boolean }> = {};
+    const updateData: Partial<{
+      is_private: boolean;
+      push_notifications_enabled: boolean;
+    }> = {};
 
     if (settings.is_private !== undefined) {
       updateData.is_private = settings.is_private;
+    }
+
+    if (settings.push_notifications !== undefined) {
+      updateData.push_notifications_enabled = settings.push_notifications;
     }
 
     if (Object.keys(updateData).length > 0) {
@@ -154,6 +198,14 @@ export class UsersService {
     return { blocked: true };
   }
 
+  async getBlockedUsers(userId: string) {
+    const blocks = await this.blocksRepository.find({
+      where: { blocker_id: userId },
+      relations: ['blocked'],
+    });
+    return blocks.map((b) => this.sanitizeUser(b.blocked));
+  }
+
   async updateDeviceToken(userId: string, deviceToken: string | null) {
     const updateData: any = {
       device_token: deviceToken === null ? null : deviceToken,
@@ -165,6 +217,14 @@ export class UsersService {
       success: true,
       message: deviceToken ? 'Device token registered' : 'Device token removed',
     };
+  }
+
+  async deleteAccount(userId: string) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Khong tim thay nguoi dung');
+
+    await this.usersRepository.remove(user);
+    return { message: 'Da xoa tai khoan' };
   }
 
   private sanitizeUser(user: User) {

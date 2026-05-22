@@ -167,69 +167,17 @@ export class AuthService {
   }
 
   async appleAuth(token: string) {
-    try {
-      // For Apple, the token verification is done client-side
-      // Here we just parse the JWT and verify signature with Apple's public key
-      // For now, we'll do basic JWT parsing as verification happens on client
-
-      // Decode JWT to get user info (in production, verify with Apple's public key)
-      const decoded = this.jwtService.decode(token) as any;
-
-      if (!decoded) {
-        throw new BadRequestException('Invalid Apple token');
-      }
-
-      const { sub: appleId, email } = decoded;
-
-      // Find or create user
-      let user = await this.usersRepository.findOne({
-        where: { apple_id: appleId },
-      });
-
-      if (!user) {
-        // Check if email already exists (Apple might not always provide email)
-        if (email) {
-          const existingUser = await this.usersRepository.findOne({
-            where: { email },
-          });
-
-          if (existingUser) {
-            // Link Apple account
-            existingUser.apple_id = appleId;
-            user = await this.usersRepository.save(existingUser);
-          }
-        }
-
-        if (!user) {
-          // Create new user
-          user = this.usersRepository.create({
-            email: email || `apple_${appleId}@hidden-gem.local`,
-            username: `apple_user_${Date.now()}`,
-            apple_id: appleId,
-          });
-          user = await this.usersRepository.save(user);
-        }
-      }
-
-      const tokens = await this.generateTokens(user);
-      await this.usersRepository.update(user.id, {
-        refresh_token: tokens.refreshToken,
-      });
-
-      return {
-        user: this.sanitizeUser(user),
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-      };
-    } catch (error) {
-      console.error('Apple auth error:', error);
-      throw new BadRequestException('Apple authentication failed');
-    }
+    void token;
+    throw new BadRequestException(
+      'Apple authentication is disabled until server-side token verification is implemented',
+    );
   }
 
   async refreshToken(refreshToken: string) {
     try {
-      const payload = this.jwtService.verify(refreshToken);
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      });
       const user = await this.usersRepository.findOne({
         where: { id: payload.sub, refresh_token: refreshToken },
       });
@@ -251,7 +199,7 @@ export class AuthService {
 
   async logout(userId: string) {
     await this.usersRepository.update(userId, {
-      refresh_token: undefined as any,
+      refresh_token: null as any,
     });
     return { message: 'Đăng xuất thành công' };
   }
@@ -261,7 +209,10 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, { expiresIn: '15m' }),
-      this.jwtService.signAsync(payload, { expiresIn: '7d' }),
+      this.jwtService.signAsync(payload, {
+        expiresIn: '7d',
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      }),
     ]);
 
     return { accessToken, refreshToken };

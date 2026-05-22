@@ -49,8 +49,10 @@ let PlacesService = class PlacesService {
                 .createQueryBuilder()
                 .update(place_entity_1.Place)
                 .set({
-                location: () => `ST_SetSRID(ST_MakePoint(${savedPlace.longitude}, ${savedPlace.latitude}), 4326)`,
+                location: () => `ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)`,
             })
+                .setParameter('lng', savedPlace.longitude)
+                .setParameter('lat', savedPlace.latitude)
                 .where('id = :id', { id: savedPlace.id })
                 .execute();
         }
@@ -64,7 +66,7 @@ let PlacesService = class PlacesService {
         }
         return this.findById(savedPlace.id);
     }
-    async findAll(query) {
+    async findAll(query, currentUserId) {
         const { lat, lng, radius = 10, category, page = 1, limit = 20, sort = 'latest', } = query;
         const queryBuilder = this.placesRepository
             .createQueryBuilder('place')
@@ -78,7 +80,7 @@ let PlacesService = class PlacesService {
             queryBuilder.addSelect(`(6371 * acos(cos(radians(:lat)) * cos(radians(place.latitude)) * cos(radians(place.longitude) - radians(:lng)) + sin(radians(:lat)) * sin(radians(place.latitude))))`, 'distance');
             queryBuilder.setParameter('lat', lat);
             queryBuilder.setParameter('lng', lng);
-            queryBuilder.having('distance <= :radius', { radius });
+            queryBuilder.andWhere(`(6371 * acos(cos(radians(:filterLat)) * cos(radians(place.latitude)) * cos(radians(place.longitude) - radians(:filterLng)) + sin(radians(:filterLat)) * sin(radians(place.latitude)))) <= :radius`, { filterLat: lat, filterLng: lng, radius });
         }
         switch (sort) {
             case 'popular':
@@ -96,6 +98,26 @@ let PlacesService = class PlacesService {
         const skip = (page - 1) * limit;
         queryBuilder.skip(skip).take(limit);
         const [places, total] = await queryBuilder.getManyAndCount();
+        const likedPlaceIds = new Set();
+        const bookmarkedPlaceIds = new Set();
+        const placeIds = places.map((place) => place.id);
+        if (currentUserId && placeIds.length > 0) {
+            const [likes, bookmarks] = await Promise.all([
+                this.likesRepository.find({
+                    where: { user_id: currentUserId, place_id: (0, typeorm_2.In)(placeIds) },
+                    select: ['place_id'],
+                }),
+                this.bookmarksRepository
+                    .createQueryBuilder('bookmark')
+                    .select('bookmark.place_id', 'place_id')
+                    .innerJoin('bookmark.collection', 'collection')
+                    .where('bookmark.place_id IN (:...placeIds)', { placeIds })
+                    .andWhere('collection.user_id = :userId', { userId: currentUserId })
+                    .getRawMany(),
+            ]);
+            likes.forEach((like) => likedPlaceIds.add(like.place_id));
+            bookmarks.forEach((bookmark) => bookmarkedPlaceIds.add(bookmark.place_id));
+        }
         return {
             data: places.map((place) => ({
                 ...place,
@@ -106,6 +128,8 @@ let PlacesService = class PlacesService {
                         avatar_url: place.user.avatar_url,
                     }
                     : null,
+                is_liked: likedPlaceIds.has(place.id),
+                is_bookmarked: bookmarkedPlaceIds.has(place.id),
             })),
             meta: {
                 page,
@@ -131,9 +155,12 @@ let PlacesService = class PlacesService {
                 this.likesRepository.findOne({
                     where: { user_id: currentUserId, place_id: id },
                 }),
-                this.bookmarksRepository.findOne({
-                    where: { place_id: id },
-                }),
+                this.bookmarksRepository
+                    .createQueryBuilder('bookmark')
+                    .innerJoin('bookmark.collection', 'collection')
+                    .where('bookmark.place_id = :placeId', { placeId: id })
+                    .andWhere('collection.user_id = :userId', { userId: currentUserId })
+                    .getOne(),
             ]);
             isLiked = !!like;
             isBookmarked = !!bookmark;
@@ -151,8 +178,8 @@ let PlacesService = class PlacesService {
             is_bookmarked: isBookmarked,
         };
     }
-    async findNearby(lat, lng, radius = 5, limit = 20) {
-        return this.findAll({ lat, lng, radius, sort: 'nearest', limit, page: 1 });
+    async findNearby(lat, lng, radius = 5, limit = 20, currentUserId) {
+        return this.findAll({ lat, lng, radius, sort: 'nearest', limit, page: 1 }, currentUserId);
     }
     async toggleLike(userId, placeId) {
         const place = await this.placesRepository.findOne({
@@ -167,8 +194,13 @@ let PlacesService = class PlacesService {
         });
         if (existingLike) {
             await this.likesRepository.remove(existingLike);
-            await this.placesRepository.decrement({ id: placeId }, 'like_count', 1);
-            return { liked: false, like_count: place.like_count - 1 };
+            await this.placesRepository
+                .createQueryBuilder()
+                .update(place_entity_1.Place)
+                .set({ like_count: () => 'GREATEST(like_count - 1, 0)' })
+                .where('id = :id', { id: placeId })
+                .execute();
+            return { liked: false, like_count: Math.max(place.like_count - 1, 0) };
         }
         const like = this.likesRepository.create({
             user_id: userId,
@@ -203,14 +235,21 @@ let PlacesService = class PlacesService {
         if (!place) {
             throw new common_1.NotFoundException('Không tìm thấy địa điểm');
         }
-        const existingBookmark = await this.bookmarksRepository.findOne({
-            where: { place_id: placeId },
-            relations: ['collection'],
-        });
-        if (existingBookmark && existingBookmark.collection?.user_id === userId) {
+        const existingBookmark = await this.bookmarksRepository
+            .createQueryBuilder('bookmark')
+            .innerJoinAndSelect('bookmark.collection', 'collection')
+            .where('bookmark.place_id = :placeId', { placeId })
+            .andWhere('collection.user_id = :userId', { userId })
+            .getOne();
+        if (existingBookmark) {
             await this.bookmarksRepository.remove(existingBookmark);
-            await this.placesRepository.decrement({ id: placeId }, 'bookmark_count', 1);
-            return { bookmarked: false, bookmark_count: place.bookmark_count - 1 };
+            await this.placesRepository
+                .createQueryBuilder()
+                .update(place_entity_1.Place)
+                .set({ bookmark_count: () => 'GREATEST(bookmark_count - 1, 0)' })
+                .where('id = :id', { id: placeId })
+                .execute();
+            return { bookmarked: false, bookmark_count: Math.max(0, place.bookmark_count - 1) };
         }
         const collectionRepo = this.bookmarksRepository.manager.getRepository(bookmark_collection_entity_1.BookmarkCollection);
         let defaultCollection = await collectionRepo.findOne({

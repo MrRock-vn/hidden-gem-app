@@ -32,7 +32,7 @@ exports.PlacesModule = PlacesModule = __decorate([
             platform_express_1.MulterModule.register({
                 storage: (0, multer_1.memoryStorage)(),
                 fileFilter: (req, file, cb) => {
-                    if (file.mimetype.match(/\/(jpg|jpeg|png|gif|webp)$/)) {
+                    if (file.mimetype.match(/\/(jpg|jpeg|png|gif|webp|heic|heif)$/i)) {
                         cb(null, true);
                     }
                     else {

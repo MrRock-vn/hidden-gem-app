@@ -20,7 +20,7 @@ import { User } from '../users/entities/user.entity';
     MulterModule.register({
       storage: memoryStorage(), // Store in memory for Sharp processing
       fileFilter: (req, file, cb) => {
-        if (file.mimetype.match(/\/(jpg|jpeg|png|gif|webp)$/)) {
+        if (file.mimetype.match(/\/(jpg|jpeg|png|gif|webp|heic|heif)$/i)) {
           cb(null, true);
         } else {
           cb(new Error('Chỉ chấp nhận file ảnh (jpg, png, gif, webp)'), false);

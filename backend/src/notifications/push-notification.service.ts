@@ -1,13 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 import admin from 'firebase-admin';
+import { Repository } from 'typeorm';
+import { User } from '../users/entities/user.entity';
 
 @Injectable()
 export class PushNotificationService {
   private readonly logger = new Logger(PushNotificationService.name);
   private firebaseApp: admin.app.App;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @InjectRepository(User)
+    private usersRepository: Repository<User>,
+  ) {
     this.initializeFirebase();
   }
 
@@ -51,6 +58,10 @@ export class PushNotificationService {
     body: string,
     data?: Record<string, string>,
   ): Promise<boolean> {
+    if (deviceToken.startsWith('ExponentPushToken[')) {
+      return this.sendToExpoDevice(deviceToken, title, body, data);
+    }
+
     if (!this.firebaseApp) {
       this.logger.warn('Firebase not initialized. Cannot send notification.');
       return false;
@@ -98,6 +109,57 @@ export class PushNotificationService {
       );
       return false;
     }
+  }
+
+  private async sendToExpoDevice(
+    deviceToken: string,
+    title: string,
+    body: string,
+    data?: Record<string, string>,
+  ): Promise<boolean> {
+    try {
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Accept-Encoding': 'gzip, deflate',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: deviceToken,
+          title,
+          body,
+          data: {
+            ...data,
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        this.logger.error(`Expo push failed with status ${response.status}`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send Expo push to ${deviceToken}:`, error);
+      return false;
+    }
+  }
+
+  private async sendToUserDevice(
+    userId: string,
+    title: string,
+    body: string,
+    data?: Record<string, string>,
+  ): Promise<boolean> {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user?.device_token || !user.push_notifications_enabled) {
+      return false;
+    }
+
+    return this.sendToDevice(user.device_token, title, body, data);
   }
 
   /**
@@ -262,9 +324,8 @@ export class PushNotificationService {
     commentText: string,
     placeId: string,
   ): Promise<boolean> {
-    const topicName = `place-comments-${placeId}`;
-    return this.sendToTopic(
-      topicName,
+    return this.sendToUserDevice(
+      userId,
       '💬 Bình luận mới',
       `${commenterUsername}: "${commentText.substring(0, 50)}..."`,
       {
@@ -283,9 +344,8 @@ export class PushNotificationService {
     placeTitle: string,
     placeId: string,
   ): Promise<boolean> {
-    const topicName = `place-likes-${placeId}`;
-    return this.sendToTopic(
-      topicName,
+    return this.sendToUserDevice(
+      userId,
       '❤️ Ai đó đã thích bài của bạn',
       `"${placeTitle}" vừa nhận được 1 lượt thích`,
       {
@@ -303,9 +363,8 @@ export class PushNotificationService {
     userId: string,
     followerUsername: string,
   ): Promise<boolean> {
-    const topicName = `followers-${userId}`;
-    return this.sendToTopic(
-      topicName,
+    return this.sendToUserDevice(
+      userId,
       '👤 Người theo dõi mới',
       `${followerUsername} bắt đầu theo dõi bạn`,
       {
@@ -325,12 +384,11 @@ export class PushNotificationService {
     contextId: string,
     mentionType: 'comment' | 'post' = 'comment',
   ): Promise<boolean> {
-    const topicName = `mentions-${userId}`;
     const typeEmoji = mentionType === 'comment' ? '💬' : '📝';
     const typeText = mentionType === 'comment' ? 'bình luận' : 'bài viết';
 
-    return this.sendToTopic(
-      topicName,
+    return this.sendToUserDevice(
+      userId,
       `${typeEmoji} @${mentionerUsername} đã nhắc đến bạn`,
       `"${mentionContext.substring(0, 40)}..." trong một ${typeText}`,
       {

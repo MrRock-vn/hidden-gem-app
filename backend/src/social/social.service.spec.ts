@@ -4,14 +4,20 @@ import { SocialService } from './social.service';
 import { Comment } from './entities/comment.entity';
 import { Follow } from './entities/follow.entity';
 import { Like } from './entities/like.entity';
+import { Place } from '../places/entities/place.entity';
+import { User } from '../users/entities/user.entity';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { PushNotificationService } from '../notifications/push-notification.service';
 
 describe('SocialService', () => {
   let service: SocialService;
   let mockCommentRepository: any;
   let mockFollowRepository: any;
   let mockLikeRepository: any;
+  let mockPlaceRepository: any;
+  let mockUserRepository: any;
   let mockRealtimeGateway: any;
+  let mockPushNotificationService: any;
 
   beforeEach(async () => {
     mockCommentRepository = {
@@ -36,9 +42,26 @@ describe('SocialService', () => {
       delete: jest.fn(),
     };
 
+    mockPlaceRepository = {
+      findOne: jest.fn(),
+      increment: jest.fn(),
+      decrement: jest.fn(),
+    };
+
+    mockUserRepository = {
+      findOne: jest.fn(),
+      find: jest.fn(),
+    };
+
     mockRealtimeGateway = {
       emitNewComment: jest.fn(),
       emitCommentDeleted: jest.fn(),
+    };
+
+    mockPushNotificationService = {
+      notifyNewComment: jest.fn(),
+      notifyMention: jest.fn(),
+      notifyNewFollower: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -57,8 +80,20 @@ describe('SocialService', () => {
           useValue: mockLikeRepository,
         },
         {
+          provide: getRepositoryToken(Place),
+          useValue: mockPlaceRepository,
+        },
+        {
+          provide: getRepositoryToken(User),
+          useValue: mockUserRepository,
+        },
+        {
           provide: RealtimeGateway,
           useValue: mockRealtimeGateway,
+        },
+        {
+          provide: PushNotificationService,
+          useValue: mockPushNotificationService,
         },
       ],
     }).compile();

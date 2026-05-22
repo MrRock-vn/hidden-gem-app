@@ -24,6 +24,8 @@ const realtime_module_1 = require("./realtime/realtime.module");
 const queue_module_1 = require("./queue/queue.module");
 const config_module_1 = require("./config/config.module");
 const jwt_auth_guard_1 = require("./auth/guards/jwt-auth.guard");
+const app_controller_1 = require("./app.controller");
+const app_service_1 = require("./app.service");
 const user_entity_1 = require("./users/entities/user.entity");
 const place_entity_1 = require("./places/entities/place.entity");
 const place_image_entity_1 = require("./places/entities/place-image.entity");
@@ -34,6 +36,9 @@ const block_entity_1 = require("./social/entities/block.entity");
 const bookmark_collection_entity_1 = require("./bookmarks/entities/bookmark-collection.entity");
 const bookmark_entity_1 = require("./bookmarks/entities/bookmark.entity");
 const notification_entity_1 = require("./notifications/entities/notification.entity");
+const conversation_entity_1 = require("./chat/entities/conversation.entity");
+const message_entity_1 = require("./chat/entities/message.entity");
+const chat_module_1 = require("./chat/chat.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -65,8 +70,11 @@ exports.AppModule = AppModule = __decorate([
                         bookmark_collection_entity_1.BookmarkCollection,
                         bookmark_entity_1.Bookmark,
                         notification_entity_1.Notification,
+                        conversation_entity_1.Conversation,
+                        message_entity_1.Message,
                     ],
-                    synchronize: true,
+                    synchronize: configService.get('NODE_ENV') !== 'production' &&
+                        configService.get('TYPEORM_SYNCHRONIZE') === 'true',
                     logging: configService.get('NODE_ENV') === 'development',
                 }),
             }),
@@ -84,8 +92,11 @@ exports.AppModule = AppModule = __decorate([
             realtime_module_1.RealtimeModule,
             queue_module_1.QueueModule,
             config_module_1.AppConfigModule,
+            chat_module_1.ChatModule,
         ],
+        controllers: [app_controller_1.AppController],
         providers: [
+            app_service_1.AppService,
             {
                 provide: core_1.APP_GUARD,
                 useClass: jwt_auth_guard_1.JwtAuthGuard,

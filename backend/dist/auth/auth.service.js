@@ -167,52 +167,14 @@ let AuthService = class AuthService {
         }
     }
     async appleAuth(token) {
-        try {
-            const decoded = this.jwtService.decode(token);
-            if (!decoded) {
-                throw new common_1.BadRequestException('Invalid Apple token');
-            }
-            const { sub: appleId, email } = decoded;
-            let user = await this.usersRepository.findOne({
-                where: { apple_id: appleId },
-            });
-            if (!user) {
-                if (email) {
-                    const existingUser = await this.usersRepository.findOne({
-                        where: { email },
-                    });
-                    if (existingUser) {
-                        existingUser.apple_id = appleId;
-                        user = await this.usersRepository.save(existingUser);
-                    }
-                }
-                if (!user) {
-                    user = this.usersRepository.create({
-                        email: email || `apple_${appleId}@hidden-gem.local`,
-                        username: `apple_user_${Date.now()}`,
-                        apple_id: appleId,
-                    });
-                    user = await this.usersRepository.save(user);
-                }
-            }
-            const tokens = await this.generateTokens(user);
-            await this.usersRepository.update(user.id, {
-                refresh_token: tokens.refreshToken,
-            });
-            return {
-                user: this.sanitizeUser(user),
-                accessToken: tokens.accessToken,
-                refreshToken: tokens.refreshToken,
-            };
-        }
-        catch (error) {
-            console.error('Apple auth error:', error);
-            throw new common_1.BadRequestException('Apple authentication failed');
-        }
+        void token;
+        throw new common_1.BadRequestException('Apple authentication is disabled until server-side token verification is implemented');
     }
     async refreshToken(refreshToken) {
         try {
-            const payload = this.jwtService.verify(refreshToken);
+            const payload = this.jwtService.verify(refreshToken, {
+                secret: this.configService.get('JWT_REFRESH_SECRET'),
+            });
             const user = await this.usersRepository.findOne({
                 where: { id: payload.sub, refresh_token: refreshToken },
             });
@@ -231,7 +193,7 @@ let AuthService = class AuthService {
     }
     async logout(userId) {
         await this.usersRepository.update(userId, {
-            refresh_token: undefined,
+            refresh_token: null,
         });
         return { message: 'Đăng xuất thành công' };
     }
@@ -239,7 +201,10 @@ let AuthService = class AuthService {
         const payload = { sub: user.id, email: user.email };
         const [accessToken, refreshToken] = await Promise.all([
             this.jwtService.signAsync(payload, { expiresIn: '15m' }),
-            this.jwtService.signAsync(payload, { expiresIn: '7d' }),
+            this.jwtService.signAsync(payload, {
+                expiresIn: '7d',
+                secret: this.configService.get('JWT_REFRESH_SECRET'),
+            }),
         ]);
         return { accessToken, refreshToken };
     }

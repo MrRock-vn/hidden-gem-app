@@ -76,6 +76,25 @@ export declare class UsersService {
         notifications: import("../notifications/entities/notification.entity").Notification[];
         bookmark_collections: import("../bookmarks/entities/bookmark-collection.entity").BookmarkCollection[];
     }>;
+    updateEmail(userId: string, email: string): Promise<{
+        id: string;
+        username: string;
+        email: string;
+        avatar_url?: string;
+        bio?: string;
+        city?: string;
+        is_private: boolean;
+        device_token?: string;
+        push_notifications_enabled: boolean;
+        created_at: Date;
+        places: import("../places/entities/place.entity").Place[];
+        comments: import("../social/entities/comment.entity").Comment[];
+        notifications: import("../notifications/entities/notification.entity").Notification[];
+        bookmark_collections: import("../bookmarks/entities/bookmark-collection.entity").BookmarkCollection[];
+    }>;
+    updatePassword(userId: string, currentPassword: string, newPassword: string): Promise<{
+        message: string;
+    }>;
     getSettings(userId: string): Promise<{
         push_notifications: boolean;
         is_private: boolean;
@@ -95,8 +114,27 @@ export declare class UsersService {
     blockUser(blockerId: string, blockedId: string): Promise<{
         blocked: boolean;
     }>;
+    getBlockedUsers(userId: string): Promise<{
+        id: string;
+        username: string;
+        email: string;
+        avatar_url?: string;
+        bio?: string;
+        city?: string;
+        is_private: boolean;
+        device_token?: string;
+        push_notifications_enabled: boolean;
+        created_at: Date;
+        places: import("../places/entities/place.entity").Place[];
+        comments: import("../social/entities/comment.entity").Comment[];
+        notifications: import("../notifications/entities/notification.entity").Notification[];
+        bookmark_collections: import("../bookmarks/entities/bookmark-collection.entity").BookmarkCollection[];
+    }[]>;
     updateDeviceToken(userId: string, deviceToken: string | null): Promise<{
         success: boolean;
+        message: string;
+    }>;
+    deleteAccount(userId: string): Promise<{
         message: string;
     }>;
     private sanitizeUser;

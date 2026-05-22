@@ -11,6 +11,29 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreatePlaceDto = void 0;
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
+function parseTags(value) {
+    if (value === undefined || value === null || value === '') {
+        return undefined;
+    }
+    if (Array.isArray(value)) {
+        return value.map((tag) => String(tag).trim()).filter(Boolean);
+    }
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+                return parsed.map((tag) => String(tag).trim()).filter(Boolean);
+            }
+        }
+        catch { }
+        return value
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean);
+    }
+    return undefined;
+}
 class CreatePlaceDto {
     title;
     description;
@@ -52,11 +75,19 @@ __decorate([
     __metadata("design:type", String)
 ], CreatePlaceDto.prototype, "address", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => parseTags(value)),
     (0, class_validator_1.IsArray)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
 ], CreatePlaceDto.prototype, "tags", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => {
+        if (value === undefined || value === null || value === '')
+            return undefined;
+        if (typeof value === 'boolean')
+            return value;
+        return value === 'true';
+    }),
     (0, class_validator_1.IsBoolean)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Boolean)

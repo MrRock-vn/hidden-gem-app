@@ -88,7 +88,7 @@ export class MediaService {
    */
   async uploadFile(
     buffer: Buffer,
-    type: 'place-image' | 'avatar' | 'thumbnail',
+    type: 'place-image' | 'avatar' | 'thumbnail' | 'chat-image',
     originalName: string,
   ): Promise<string> {
     const fileExtension = '.webp'; // Sharp output is WebP
@@ -200,5 +200,30 @@ export class MediaService {
     });
 
     return this.uploadFile(optimized, 'avatar', file.originalname);
+  }
+
+  /**
+   * Process chat image: optimize + upload
+   */
+  async processChatImage(file: Express.Multer.File): Promise<string> {
+    if (!file) {
+      throw new BadRequestException('Không có file ảnh');
+    }
+
+    if (!file.mimetype.startsWith('image/')) {
+      throw new BadRequestException('File không phải là ảnh');
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      throw new BadRequestException('File quá lớn (max 10MB)');
+    }
+
+    const optimized = await this.optimizeImage(file.buffer, {
+      width: 1200,
+      height: 1200,
+      quality: 80,
+    });
+
+    return this.uploadFile(optimized, 'chat-image', file.originalname);
   }
 }

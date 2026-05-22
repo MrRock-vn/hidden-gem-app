@@ -25,10 +25,15 @@ export class PlacesController {
     private readonly mediaService: MediaService,
   ) {}
 
+  // Static routes MUST come before parameterized routes to avoid :id catching them
+
   @Public()
   @Get()
-  async findAll(@Query() query: QueryPlaceDto) {
-    return this.placesService.findAll(query);
+  async findAll(
+    @Query() query: QueryPlaceDto,
+    @CurrentUser('id') currentUserId?: string,
+  ) {
+    return this.placesService.findAll(query, currentUserId);
   }
 
   @Public()
@@ -38,15 +43,32 @@ export class PlacesController {
     @Query('lng') lng: number,
     @Query('radius') radius?: number,
     @Query('limit') limit?: number,
+    @CurrentUser('id') currentUserId?: string,
   ) {
     return this.placesService.findNearby(
       +lat,
       +lng,
       radius ? +radius : undefined,
       limit ? +limit : undefined,
+      currentUserId,
     );
   }
 
+  @Public()
+  @Get('user/:userId')
+  async getUserPlaces(
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.placesService.getUserPlaces(
+      userId,
+      page ? +page : undefined,
+      limit ? +limit : undefined,
+    );
+  }
+
+  // Dynamic :id route AFTER all static routes
   @Public()
   @Get(':id')
   async findOne(
@@ -63,13 +85,49 @@ export class PlacesController {
     @Body() createPlaceDto: CreatePlaceDto,
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
+    const normalizedDto = this.normalizeCreatePlaceDto(createPlaceDto);
+
     // Process images: optimize + upload to S3/local
     const imageUrls =
       files && files.length > 0
         ? await this.mediaService.processPlaceImages(files)
         : [];
 
-    return this.placesService.create(userId, createPlaceDto, imageUrls);
+    return this.placesService.create(userId, normalizedDto, imageUrls);
+  }
+
+  private normalizeCreatePlaceDto(dto: CreatePlaceDto): CreatePlaceDto {
+    const tags = dto.tags as unknown;
+
+    return {
+      ...dto,
+      latitude: Number(dto.latitude),
+      longitude: Number(dto.longitude),
+      tags:
+        typeof tags === 'string'
+          ? this.parseTags(tags)
+          : Array.isArray(tags)
+            ? tags
+            : undefined,
+      is_published:
+        typeof dto.is_published === 'string'
+          ? dto.is_published === 'true'
+          : dto.is_published,
+    };
+  }
+
+  private parseTags(tags: string): string[] {
+    try {
+      const parsed = JSON.parse(tags);
+      if (Array.isArray(parsed)) {
+        return parsed.map((tag) => String(tag).trim()).filter(Boolean);
+      }
+    } catch {}
+
+    return tags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
   }
 
   @Post(':id/like')
@@ -94,18 +152,5 @@ export class PlacesController {
     @Param('id', ParseUUIDPipe) placeId: string,
   ) {
     return this.placesService.toggleBookmark(userId, placeId);
-  }
-  @Public()
-  @Get('user/:userId')
-  async getUserPlaces(
-    @Param('userId', ParseUUIDPipe) userId: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.placesService.getUserPlaces(
-      userId,
-      page ? +page : undefined,
-      limit ? +limit : undefined,
-    );
   }
 }

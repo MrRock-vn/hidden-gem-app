@@ -9,6 +9,7 @@ import {
   UseInterceptors,
   UploadedFile,
   ParseUUIDPipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
@@ -24,13 +25,11 @@ export class UsersController {
     private readonly mediaService: MediaService,
   ) {}
 
-  @Public()
-  @Get(':id')
-  async getUser(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser('id') currentUserId?: string,
-  ) {
-    return this.usersService.getProfile(id, currentUserId);
+  // All 'me/*' routes MUST come before ':id' to avoid :id='me' matching
+
+  @Get('me')
+  async getMe(@CurrentUser('id') userId: string) {
+    return this.usersService.getProfile(userId, userId);
   }
 
   @Patch('me')
@@ -48,7 +47,7 @@ export class UsersController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     if (!file) {
-      throw new Error('Không có file ảnh');
+      throw new BadRequestException('Không có file ảnh');
     }
 
     // Process avatar: optimize + upload to S3/local
@@ -74,12 +73,37 @@ export class UsersController {
     return this.usersService.updateSettings(userId, settings);
   }
 
-  @Post(':id/block')
-  async blockUser(
-    @CurrentUser('id') blockerId: string,
-    @Param('id', ParseUUIDPipe) blockedId: string,
+  @Get('me/blocks')
+  async getBlockedList(@CurrentUser('id') userId: string) {
+    return this.usersService.getBlockedUsers(userId);
+  }
+
+  @Patch('me/email')
+  async updateEmail(
+    @CurrentUser('id') userId: string,
+    @Body('email') email: string,
   ) {
-    return this.usersService.blockUser(blockerId, blockedId);
+    if (!email || !email.includes('@')) {
+      throw new BadRequestException('Email khong hop le');
+    }
+    return this.usersService.updateEmail(userId, email.trim().toLowerCase());
+  }
+
+  @Patch('me/password')
+  async updatePassword(
+    @CurrentUser('id') userId: string,
+    @Body('currentPassword') currentPassword: string,
+    @Body('newPassword') newPassword: string,
+  ) {
+    if (!currentPassword || !newPassword || newPassword.length < 6) {
+      throw new BadRequestException('Mat khau moi phai co it nhat 6 ky tu');
+    }
+    return this.usersService.updatePassword(userId, currentPassword, newPassword);
+  }
+
+  @Delete('me')
+  async deleteMe(@CurrentUser('id') userId: string) {
+    return this.usersService.deleteAccount(userId);
   }
 
   @Post('me/device-token')
@@ -88,7 +112,7 @@ export class UsersController {
     @Body('token') token: string,
   ) {
     if (!token || token.trim().length === 0) {
-      throw new Error('Token không hợp lệ');
+      throw new BadRequestException('Token không hợp lệ');
     }
     return this.usersService.updateDeviceToken(userId, token);
   }
@@ -96,5 +120,23 @@ export class UsersController {
   @Delete('me/device-token')
   async unregisterDeviceToken(@CurrentUser('id') userId: string) {
     return this.usersService.updateDeviceToken(userId, null);
+  }
+
+  // Dynamic ':id' route AFTER all 'me/*' routes
+  @Public()
+  @Get(':id')
+  async getUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') currentUserId?: string,
+  ) {
+    return this.usersService.getProfile(id, currentUserId);
+  }
+
+  @Post(':id/block')
+  async blockUser(
+    @CurrentUser('id') blockerId: string,
+    @Param('id', ParseUUIDPipe) blockedId: string,
+  ) {
+    return this.usersService.blockUser(blockerId, blockedId);
   }
 }

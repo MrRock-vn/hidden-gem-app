@@ -41,13 +41,15 @@ export declare class PlacesService {
         images: PlaceImage[];
         comments: import("../social/entities/comment.entity").Comment[];
     }>;
-    findAll(query: QueryPlaceDto): Promise<{
+    findAll(query: QueryPlaceDto, currentUserId?: string): Promise<{
         data: {
             user: {
                 id: string;
                 username: string;
                 avatar_url: string | undefined;
             } | null;
+            is_liked: boolean;
+            is_bookmarked: boolean;
             id: string;
             user_id: string;
             title: string;
@@ -100,13 +102,15 @@ export declare class PlacesService {
         images: PlaceImage[];
         comments: import("../social/entities/comment.entity").Comment[];
     }>;
-    findNearby(lat: number, lng: number, radius?: number, limit?: number): Promise<{
+    findNearby(lat: number, lng: number, radius?: number, limit?: number, currentUserId?: string): Promise<{
         data: {
             user: {
                 id: string;
                 username: string;
                 avatar_url: string | undefined;
             } | null;
+            is_liked: boolean;
+            is_bookmarked: boolean;
             id: string;
             user_id: string;
             title: string;

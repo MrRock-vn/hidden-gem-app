@@ -6,13 +6,15 @@ export declare class PlacesController {
     private readonly placesService;
     private readonly mediaService;
     constructor(placesService: PlacesService, mediaService: MediaService);
-    findAll(query: QueryPlaceDto): Promise<{
+    findAll(query: QueryPlaceDto, currentUserId?: string): Promise<{
         data: {
             user: {
                 id: string;
                 username: string;
                 avatar_url: string | undefined;
             } | null;
+            is_liked: boolean;
+            is_bookmarked: boolean;
             id: string;
             user_id: string;
             title: string;
@@ -39,13 +41,15 @@ export declare class PlacesController {
             hasMore: boolean;
         };
     }>;
-    findNearby(lat: number, lng: number, radius?: number, limit?: number): Promise<{
+    findNearby(lat: number, lng: number, radius?: number, limit?: number, currentUserId?: string): Promise<{
         data: {
             user: {
                 id: string;
                 username: string;
                 avatar_url: string | undefined;
             } | null;
+            is_liked: boolean;
+            is_bookmarked: boolean;
             id: string;
             user_id: string;
             title: string;
@@ -64,6 +68,16 @@ export declare class PlacesController {
             images: import("./entities/place-image.entity").PlaceImage[];
             comments: import("../social/entities/comment.entity").Comment[];
         }[];
+        meta: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasMore: boolean;
+        };
+    }>;
+    getUserPlaces(userId: string, page?: number, limit?: number): Promise<{
+        data: import("./entities/place.entity").Place[];
         meta: {
             page: number;
             limit: number;
@@ -124,6 +138,8 @@ export declare class PlacesController {
         images: import("./entities/place-image.entity").PlaceImage[];
         comments: import("../social/entities/comment.entity").Comment[];
     }>;
+    private normalizeCreatePlaceDto;
+    private parseTags;
     toggleLike(userId: string, placeId: string): Promise<{
         liked: boolean;
         like_count: number;
@@ -134,15 +150,5 @@ export declare class PlacesController {
     toggleBookmark(userId: string, placeId: string): Promise<{
         bookmarked: boolean;
         bookmark_count: number;
-    }>;
-    getUserPlaces(userId: string, page?: number, limit?: number): Promise<{
-        data: import("./entities/place.entity").Place[];
-        meta: {
-            page: number;
-            limit: number;
-            total: number;
-            totalPages: number;
-            hasMore: boolean;
-        };
     }>;
 }

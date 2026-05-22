@@ -26,7 +26,7 @@ export class EnvValidationService {
       DATABASE_HOST: null,
       DATABASE_PORT: null,
       DATABASE_NAME: null,
-      DATABASE_USER: null,
+      DATABASE_USERNAME: null, // Used by app.module.ts TypeORM config
       DATABASE_PASSWORD: null,
 
       // Redis

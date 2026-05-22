@@ -16,6 +16,8 @@ import { QueueModule } from './queue/queue.module';
 import { AppConfigModule } from './config/config.module';
 import { EnvValidationService } from './config/env-validation.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 // Entities
 import { User } from './users/entities/user.entity';
@@ -28,6 +30,9 @@ import { Block } from './social/entities/block.entity';
 import { BookmarkCollection } from './bookmarks/entities/bookmark-collection.entity';
 import { Bookmark } from './bookmarks/entities/bookmark.entity';
 import { Notification } from './notifications/entities/notification.entity';
+import { Conversation } from './chat/entities/conversation.entity';
+import { Message } from './chat/entities/message.entity';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -59,8 +64,12 @@ import { Notification } from './notifications/entities/notification.entity';
           BookmarkCollection,
           Bookmark,
           Notification,
+          Conversation,
+          Message,
         ],
-        synchronize: true, // Auto-create tables in dev (disable in production!)
+        synchronize:
+          configService.get('NODE_ENV') !== 'production' &&
+          configService.get<string>('TYPEORM_SYNCHRONIZE') === 'true',
         logging: configService.get('NODE_ENV') === 'development',
       }),
     }),
@@ -82,8 +91,11 @@ import { Notification } from './notifications/entities/notification.entity';
     RealtimeModule,
     QueueModule,
     AppConfigModule,
+    ChatModule,
   ],
+  controllers: [AppController],
   providers: [
+    AppService,
     // Global JWT Guard - all routes require auth by default
     {
       provide: APP_GUARD,

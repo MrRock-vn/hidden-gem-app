@@ -14,12 +14,13 @@ const notifications_service_1 = require("./notifications.service");
 const notifications_controller_1 = require("./notifications.controller");
 const push_notification_service_1 = require("./push-notification.service");
 const notification_entity_1 = require("./entities/notification.entity");
+const user_entity_1 = require("../users/entities/user.entity");
 let NotificationsModule = class NotificationsModule {
 };
 exports.NotificationsModule = NotificationsModule;
 exports.NotificationsModule = NotificationsModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([notification_entity_1.Notification]), config_1.ConfigModule],
+        imports: [typeorm_1.TypeOrmModule.forFeature([notification_entity_1.Notification, user_entity_1.User]), config_1.ConfigModule],
         controllers: [notifications_controller_1.NotificationsController],
         providers: [notifications_service_1.NotificationsService, push_notification_service_1.PushNotificationService],
         exports: [notifications_service_1.NotificationsService, push_notification_service_1.PushNotificationService],

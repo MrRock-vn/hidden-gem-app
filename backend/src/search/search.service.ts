@@ -198,7 +198,10 @@ export class SearchService {
         );
         placesQuery.setParameter('lat', filters.lat);
         placesQuery.setParameter('lng', filters.lng);
-        placesQuery.having('distance <= :radius', { radius });
+        placesQuery.andWhere(
+          `(6371 * acos(cos(radians(:filterLat)) * cos(radians(place.latitude)) * cos(radians(place.longitude) - radians(:filterLng)) + sin(radians(:filterLat)) * sin(radians(place.latitude)))) <= :radius`,
+          { filterLat: filters.lat, filterLng: filters.lng, radius },
+        );
         placesQuery.orderBy('distance', 'ASC');
       } else {
         placesQuery.orderBy('place.like_count', 'DESC');

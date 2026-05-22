@@ -28,20 +28,53 @@ let PlacesController = class PlacesController {
         this.placesService = placesService;
         this.mediaService = mediaService;
     }
-    async findAll(query) {
-        return this.placesService.findAll(query);
+    async findAll(query, currentUserId) {
+        return this.placesService.findAll(query, currentUserId);
     }
-    async findNearby(lat, lng, radius, limit) {
-        return this.placesService.findNearby(+lat, +lng, radius ? +radius : undefined, limit ? +limit : undefined);
+    async findNearby(lat, lng, radius, limit, currentUserId) {
+        return this.placesService.findNearby(+lat, +lng, radius ? +radius : undefined, limit ? +limit : undefined, currentUserId);
+    }
+    async getUserPlaces(userId, page, limit) {
+        return this.placesService.getUserPlaces(userId, page ? +page : undefined, limit ? +limit : undefined);
     }
     async findOne(id, currentUserId) {
         return this.placesService.findById(id, currentUserId);
     }
     async create(userId, createPlaceDto, files) {
+        const normalizedDto = this.normalizeCreatePlaceDto(createPlaceDto);
         const imageUrls = files && files.length > 0
             ? await this.mediaService.processPlaceImages(files)
             : [];
-        return this.placesService.create(userId, createPlaceDto, imageUrls);
+        return this.placesService.create(userId, normalizedDto, imageUrls);
+    }
+    normalizeCreatePlaceDto(dto) {
+        const tags = dto.tags;
+        return {
+            ...dto,
+            latitude: Number(dto.latitude),
+            longitude: Number(dto.longitude),
+            tags: typeof tags === 'string'
+                ? this.parseTags(tags)
+                : Array.isArray(tags)
+                    ? tags
+                    : undefined,
+            is_published: typeof dto.is_published === 'string'
+                ? dto.is_published === 'true'
+                : dto.is_published,
+        };
+    }
+    parseTags(tags) {
+        try {
+            const parsed = JSON.parse(tags);
+            if (Array.isArray(parsed)) {
+                return parsed.map((tag) => String(tag).trim()).filter(Boolean);
+            }
+        }
+        catch { }
+        return tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean);
     }
     async toggleLike(userId, placeId) {
         return this.placesService.toggleLike(userId, placeId);
@@ -52,17 +85,15 @@ let PlacesController = class PlacesController {
     async toggleBookmark(userId, placeId) {
         return this.placesService.toggleBookmark(userId, placeId);
     }
-    async getUserPlaces(userId, page, limit) {
-        return this.placesService.getUserPlaces(userId, page ? +page : undefined, limit ? +limit : undefined);
-    }
 };
 exports.PlacesController = PlacesController;
 __decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)('id')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [query_place_dto_1.QueryPlaceDto]),
+    __metadata("design:paramtypes", [query_place_dto_1.QueryPlaceDto, String]),
     __metadata("design:returntype", Promise)
 ], PlacesController.prototype, "findAll", null);
 __decorate([
@@ -72,10 +103,21 @@ __decorate([
     __param(1, (0, common_1.Query)('lng')),
     __param(2, (0, common_1.Query)('radius')),
     __param(3, (0, common_1.Query)('limit')),
+    __param(4, (0, current_user_decorator_1.CurrentUser)('id')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Number, Number, Number]),
+    __metadata("design:paramtypes", [Number, Number, Number, Number, String]),
     __metadata("design:returntype", Promise)
 ], PlacesController.prototype, "findNearby", null);
+__decorate([
+    (0, public_decorator_1.Public)(),
+    (0, common_1.Get)('user/:userId'),
+    __param(0, (0, common_1.Param)('userId', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Query)('page')),
+    __param(2, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Number, Number]),
+    __metadata("design:returntype", Promise)
+], PlacesController.prototype, "getUserPlaces", null);
 __decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.Get)(':id'),
@@ -119,16 +161,6 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], PlacesController.prototype, "toggleBookmark", null);
-__decorate([
-    (0, public_decorator_1.Public)(),
-    (0, common_1.Get)('user/:userId'),
-    __param(0, (0, common_1.Param)('userId', common_1.ParseUUIDPipe)),
-    __param(1, (0, common_1.Query)('page')),
-    __param(2, (0, common_1.Query)('limit')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Number, Number]),
-    __metadata("design:returntype", Promise)
-], PlacesController.prototype, "getUserPlaces", null);
 exports.PlacesController = PlacesController = __decorate([
     (0, common_1.Controller)('places'),
     __metadata("design:paramtypes", [places_service_1.PlacesService,

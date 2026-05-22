@@ -27,15 +27,15 @@ let UsersController = class UsersController {
         this.usersService = usersService;
         this.mediaService = mediaService;
     }
-    async getUser(id, currentUserId) {
-        return this.usersService.getProfile(id, currentUserId);
+    async getMe(userId) {
+        return this.usersService.getProfile(userId, userId);
     }
     async updateProfile(userId, updateUserDto) {
         return this.usersService.updateProfile(userId, updateUserDto);
     }
     async updateAvatar(userId, file) {
         if (!file) {
-            throw new Error('Không có file ảnh');
+            throw new common_1.BadRequestException('Không có file ảnh');
         }
         const avatarUrl = await this.mediaService.processAvatar(file);
         return this.usersService.updateAvatar(userId, avatarUrl);
@@ -46,29 +46,48 @@ let UsersController = class UsersController {
     async updateSettings(userId, settings) {
         return this.usersService.updateSettings(userId, settings);
     }
-    async blockUser(blockerId, blockedId) {
-        return this.usersService.blockUser(blockerId, blockedId);
+    async getBlockedList(userId) {
+        return this.usersService.getBlockedUsers(userId);
+    }
+    async updateEmail(userId, email) {
+        if (!email || !email.includes('@')) {
+            throw new common_1.BadRequestException('Email khong hop le');
+        }
+        return this.usersService.updateEmail(userId, email.trim().toLowerCase());
+    }
+    async updatePassword(userId, currentPassword, newPassword) {
+        if (!currentPassword || !newPassword || newPassword.length < 6) {
+            throw new common_1.BadRequestException('Mat khau moi phai co it nhat 6 ky tu');
+        }
+        return this.usersService.updatePassword(userId, currentPassword, newPassword);
+    }
+    async deleteMe(userId) {
+        return this.usersService.deleteAccount(userId);
     }
     async registerDeviceToken(userId, token) {
         if (!token || token.trim().length === 0) {
-            throw new Error('Token không hợp lệ');
+            throw new common_1.BadRequestException('Token không hợp lệ');
         }
         return this.usersService.updateDeviceToken(userId, token);
     }
     async unregisterDeviceToken(userId) {
         return this.usersService.updateDeviceToken(userId, null);
     }
+    async getUser(id, currentUserId) {
+        return this.usersService.getProfile(id, currentUserId);
+    }
+    async blockUser(blockerId, blockedId) {
+        return this.usersService.blockUser(blockerId, blockedId);
+    }
 };
 exports.UsersController = UsersController;
 __decorate([
-    (0, public_decorator_1.Public)(),
-    (0, common_1.Get)(':id'),
-    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
-    __param(1, (0, current_user_decorator_1.CurrentUser)('id')),
+    (0, common_1.Get)('me'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
-], UsersController.prototype, "getUser", null);
+], UsersController.prototype, "getMe", null);
 __decorate([
     (0, common_1.Patch)('me'),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
@@ -102,13 +121,36 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "updateSettings", null);
 __decorate([
-    (0, common_1.Post)(':id/block'),
+    (0, common_1.Get)('me/blocks'),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
-    __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "getBlockedList", null);
+__decorate([
+    (0, common_1.Patch)('me/email'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Body)('email')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
-], UsersController.prototype, "blockUser", null);
+], UsersController.prototype, "updateEmail", null);
+__decorate([
+    (0, common_1.Patch)('me/password'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Body)('currentPassword')),
+    __param(2, (0, common_1.Body)('newPassword')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "updatePassword", null);
+__decorate([
+    (0, common_1.Delete)('me'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "deleteMe", null);
 __decorate([
     (0, common_1.Post)('me/device-token'),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
@@ -124,6 +166,23 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "unregisterDeviceToken", null);
+__decorate([
+    (0, public_decorator_1.Public)(),
+    (0, common_1.Get)(':id'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, current_user_decorator_1.CurrentUser)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "getUser", null);
+__decorate([
+    (0, common_1.Post)(':id/block'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "blockUser", null);
 exports.UsersController = UsersController = __decorate([
     (0, common_1.Controller)('users'),
     __metadata("design:paramtypes", [users_service_1.UsersService,

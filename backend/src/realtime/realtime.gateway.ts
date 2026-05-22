@@ -100,7 +100,43 @@ export class RealtimeGateway
     return { success: true, placeId: data.placeId };
   }
 
+  // ===== CHAT ROOMS =====
+
+  @SubscribeMessage('joinConversation')
+  handleJoinConversation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string },
+  ) {
+    if (!data?.conversationId) {
+      return { success: false, error: 'Missing conversationId' };
+    }
+    client.join(`conversation:${data.conversationId}`);
+    return { success: true, conversationId: data.conversationId };
+  }
+
+  @SubscribeMessage('leaveConversation')
+  handleLeaveConversation(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { conversationId: string },
+  ) {
+    if (!data?.conversationId) return { success: false };
+    client.leave(`conversation:${data.conversationId}`);
+    return { success: true, conversationId: data.conversationId };
+  }
+
   // ===== EVENTS FROM BACKEND =====
+
+  // Emit new message to conversation room and notify participants
+  emitNewMessage(conversationId: string, message: any, participantIds: string[]) {
+    this.server.to(`conversation:${conversationId}`).emit('newMessage', message);
+
+    participantIds.forEach((userId) => {
+      this.server.to(`user:${userId}`).emit('conversationUpdate', {
+        conversationId,
+        lastMessage: message,
+      });
+    });
+  }
 
   // Emit new comment to all users viewing a place (real-time comments)
   emitNewComment(placeId: string, comment: any) {

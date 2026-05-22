@@ -39,6 +39,14 @@
 - Responsive design
 
 ---
+## 👥 Thành viên nhóm
+
+| STT | Họ và tên        | MSSV        | Vai trò     |
+| --- | ---------------- | ----------- | ----------- |
+| 1   | Nguyễn Công Sơn  | 23810310102 | Nhóm trưởng |
+| 2   | Nguyễn Văn Quang | 23810310108 | Thành viên  |
+| 3   | Nguyễn Văn Danh  | 23810310136 | Thành viên  |
+---
 
 ## 🛠️ Tech Stack
 
